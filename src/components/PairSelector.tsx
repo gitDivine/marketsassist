@@ -3,31 +3,38 @@
 import { useState, useEffect, useMemo, useRef } from "react";
 import { Search, TrendingUp, TrendingDown, ChevronDown, X } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import type { PairInfo } from "@/lib/types";
+import type { PairInfo, AssetClass } from "@/lib/types";
 import { cn, formatPrice } from "@/lib/utils";
 
 interface Props {
   selected: PairInfo | null;
   onSelect: (pair: PairInfo) => void;
+  classFilter?: AssetClass;
 }
 
-export default function PairSelector({ selected, onSelect }: Props) {
-  const [pairs, setPairs] = useState<PairInfo[]>([]);
+export default function PairSelector({ selected, onSelect, classFilter }: Props) {
+  const [allPairs, setAllPairs] = useState<PairInfo[]>([]);
   const [search, setSearch] = useState("");
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    setLoading(true);
     fetch("/api/pairs")
       .then((r) => r.json())
       .then((d) => {
-        setPairs(d.pairs || []);
-        if (!selected && d.pairs?.length) onSelect(d.pairs[0]);
+        setAllPairs(d.pairs || []);
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
+
+  // Filter by asset class
+  const pairs = useMemo(() => {
+    if (!classFilter) return allPairs;
+    return allPairs.filter((p) => p.class === classFilter);
+  }, [allPairs, classFilter]);
 
   // Close on outside click (desktop only — mobile has explicit close button)
   useEffect(() => {

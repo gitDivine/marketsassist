@@ -5,15 +5,17 @@ import { motion } from "framer-motion";
 import { RefreshCw } from "lucide-react";
 import Header from "@/components/Header";
 import PairSelector from "@/components/PairSelector";
+import AssetClassTabs from "@/components/AssetClassTabs";
 import TimeframeSelector from "@/components/TimeframeSelector";
 import PressureGauge from "@/components/PressureGauge";
 import ConfluencePanel from "@/components/ConfluencePanel";
 import NewsPanel from "@/components/NewsPanel";
 import AnalysisNotes from "@/components/AnalysisNotes";
-import type { PairInfo, Timeframe, PressureData, ConfluenceResult, NewsItem } from "@/lib/types";
+import type { PairInfo, Timeframe, AssetClass, PressureData, ConfluenceResult, NewsItem } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
+  const [assetClass, setAssetClass] = useState<AssetClass | "all">("all");
   const [selectedPair, setSelectedPair] = useState<PairInfo | null>(null);
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
   const [pressure, setPressure] = useState<PressureData | null>(null);
@@ -30,11 +32,21 @@ export default function Home() {
   const [errors, setErrors] = useState({ pressure: false, confluence: false, news: false });
   const [lastUpdate, setLastUpdate] = useState<Date | null>(null);
 
-  const fetchPressure = useCallback(async (symbol: string, tf: Timeframe) => {
+  // Reset selected pair when switching asset class
+  const handleClassChange = useCallback((cls: AssetClass | "all") => {
+    setAssetClass(cls);
+    setSelectedPair(null);
+    setPressure(null);
+    setConfluence(null);
+    setNews([]);
+    setNewsSentiment(null);
+  }, []);
+
+  const fetchPressure = useCallback(async (pair: PairInfo, tf: Timeframe) => {
     setLoading((l) => ({ ...l, pressure: true }));
     setErrors((e) => ({ ...e, pressure: false }));
     try {
-      const res = await fetch(`/api/pressure?symbol=${symbol}&timeframe=${tf}`);
+      const res = await fetch(`/api/pressure?symbol=${encodeURIComponent(pair.symbol)}&timeframe=${tf}&class=${pair.class}`);
       if (!res.ok) throw new Error("API error");
       const data = await res.json();
       if (data.pressure) setPressure(data.pressure);
@@ -44,11 +56,11 @@ export default function Home() {
     setLoading((l) => ({ ...l, pressure: false }));
   }, []);
 
-  const fetchConfluence = useCallback(async (symbol: string) => {
+  const fetchConfluence = useCallback(async (pair: PairInfo) => {
     setLoading((l) => ({ ...l, confluence: true }));
     setErrors((e) => ({ ...e, confluence: false }));
     try {
-      const res = await fetch(`/api/confluence?symbol=${symbol}`);
+      const res = await fetch(`/api/confluence?symbol=${encodeURIComponent(pair.symbol)}&class=${pair.class}`);
       if (!res.ok) throw new Error("API error");
       const data = await res.json();
       if (data.confluence) setConfluence(data.confluence);
@@ -58,11 +70,12 @@ export default function Home() {
     setLoading((l) => ({ ...l, confluence: false }));
   }, []);
 
-  const fetchNews = useCallback(async (base: string) => {
+  const fetchNews = useCallback(async (pair: PairInfo) => {
     setLoading((l) => ({ ...l, news: true }));
     setErrors((e) => ({ ...e, news: false }));
     try {
-      const res = await fetch(`/api/news?asset=${base}&query=${base} crypto`);
+      const category = pair.class === "crypto" ? "crypto" : pair.class === "forex" ? "forex" : "stock market";
+      const res = await fetch(`/api/news?asset=${pair.base}&query=${pair.base} ${category} price`);
       if (!res.ok) throw new Error("API error");
       const data = await res.json();
       setNews(data.news || []);
@@ -75,21 +88,21 @@ export default function Home() {
 
   const fetchAll = useCallback(() => {
     if (!selectedPair) return;
-    fetchPressure(selectedPair.symbol, timeframe);
-    fetchConfluence(selectedPair.symbol);
-    fetchNews(selectedPair.base);
+    fetchPressure(selectedPair, timeframe);
+    fetchConfluence(selectedPair);
+    fetchNews(selectedPair);
     setLastUpdate(new Date());
   }, [selectedPair, timeframe, fetchPressure, fetchConfluence, fetchNews]);
 
   useEffect(() => {
     if (!selectedPair) return;
-    fetchPressure(selectedPair.symbol, timeframe);
+    fetchPressure(selectedPair, timeframe);
   }, [selectedPair, timeframe, fetchPressure]);
 
   useEffect(() => {
     if (!selectedPair) return;
-    fetchConfluence(selectedPair.symbol);
-    fetchNews(selectedPair.base);
+    fetchConfluence(selectedPair);
+    fetchNews(selectedPair);
     setLastUpdate(new Date());
   }, [selectedPair, fetchConfluence, fetchNews]);
 
@@ -104,10 +117,19 @@ export default function Home() {
       <Header />
 
       <main className="mx-auto w-full max-w-7xl flex-1 px-3 py-4 sm:px-4 sm:py-6">
-        {/* Controls — stacks cleanly on mobile */}
+        {/* Asset class tabs */}
+        <div className="mb-3 sm:mb-4">
+          <AssetClassTabs selected={assetClass} onSelect={handleClassChange} />
+        </div>
+
+        {/* Controls */}
         <div className="mb-4 space-y-2 sm:mb-6 sm:space-y-0 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
           <div className="flex items-center gap-2">
-            <PairSelector selected={selectedPair} onSelect={setSelectedPair} />
+            <PairSelector
+              selected={selectedPair}
+              onSelect={setSelectedPair}
+              classFilter={assetClass === "all" ? undefined : assetClass}
+            />
             <button
               onClick={fetchAll}
               disabled={!selectedPair}
@@ -139,7 +161,7 @@ export default function Home() {
             </div>
             <h2 className="mb-2 text-lg font-semibold">Select a pair to begin</h2>
             <p className="max-w-sm text-sm leading-relaxed text-muted">
-              Choose a crypto pair to see real-time buying vs selling pressure with multi-timeframe confluence analysis.
+              Choose any crypto, forex, stock, or index to see real-time buying vs selling pressure with multi-timeframe confluence analysis.
             </p>
           </motion.div>
         ) : (
@@ -149,12 +171,11 @@ export default function Home() {
             transition={{ duration: 0.3 }}
             className="space-y-4 lg:grid lg:grid-cols-3 lg:gap-5 lg:space-y-0"
           >
-            {/* Left: Pressure + Confluence + Notes */}
             <div className="space-y-4 lg:col-span-2 lg:space-y-5">
-              <PressureGauge data={pressure} loading={loading.pressure} error={errors.pressure} onRetry={() => fetchPressure(selectedPair.symbol, timeframe)} />
-              <ConfluencePanel data={confluence} loading={loading.confluence} error={errors.confluence} onRetry={() => fetchConfluence(selectedPair.symbol)} />
+              <PressureGauge data={pressure} loading={loading.pressure} error={errors.pressure} onRetry={() => fetchPressure(selectedPair, timeframe)} />
+              <ConfluencePanel data={confluence} loading={loading.confluence} error={errors.confluence} onRetry={() => fetchConfluence(selectedPair)} />
               <AnalysisNotes
-                pair={selectedPair.symbol}
+                pair={selectedPair.name}
                 pressure={pressure}
                 confluence={confluence}
                 newsSentiment={newsSentiment?.overall || 0}
@@ -162,10 +183,9 @@ export default function Home() {
               />
             </div>
 
-            {/* Right: News — not sticky on mobile, sticky on desktop */}
             <div>
               <div className="lg:sticky lg:top-20">
-                <NewsPanel news={news} sentiment={newsSentiment} loading={loading.news} error={errors.news} onRetry={() => selectedPair && fetchNews(selectedPair.base)} />
+                <NewsPanel news={news} sentiment={newsSentiment} loading={loading.news} error={errors.news} onRetry={() => fetchNews(selectedPair)} />
               </div>
             </div>
           </motion.div>
