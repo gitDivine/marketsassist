@@ -43,10 +43,12 @@ export interface SwingPoint {
 
 export function detectSwingPoints(
   candles: Candle[],
-  lookback = 3
+  lookback = 5
 ): SwingPoint[] {
   const swings: SwingPoint[] = [];
   if (candles.length < lookback * 2 + 1) return swings;
+
+  const minDistance = Math.max(3, Math.floor(candles.length / 30)); // min candles between swings
 
   // Find swing highs and lows
   for (let i = lookback; i < candles.length - lookback; i++) {
@@ -61,22 +63,29 @@ export function detectSwingPoints(
     }
 
     if (isSwingHigh) {
-      swings.push({
-        time: candles[i].time,
-        price: candles[i].high,
-        type: "high",
-        label: "HH", // will be relabeled below
-        index: i,
-      });
+      // Check minimum distance from last swing high
+      const lastHigh = swings.filter(s => s.type === "high").at(-1);
+      if (!lastHigh || i - lastHigh.index >= minDistance) {
+        swings.push({
+          time: candles[i].time,
+          price: candles[i].high,
+          type: "high",
+          label: "HH",
+          index: i,
+        });
+      }
     }
     if (isSwingLow) {
-      swings.push({
-        time: candles[i].time,
-        price: candles[i].low,
-        type: "low",
-        label: "HL", // will be relabeled below
-        index: i,
-      });
+      const lastLow = swings.filter(s => s.type === "low").at(-1);
+      if (!lastLow || i - lastLow.index >= minDistance) {
+        swings.push({
+          time: candles[i].time,
+          price: candles[i].low,
+          type: "low",
+          label: "HL",
+          index: i,
+        });
+      }
     }
   }
 
@@ -172,11 +181,9 @@ export function detectOrderBlocks(candles: Candle[]): KeyZone[] {
   const impulseThreshold = avgBody * 1.5;
 
   for (let i = 1; i < candles.length - 1; i++) {
-    const prev = candles[i - 1];
     const curr = candles[i];
     const next = candles[i + 1];
 
-    const currBody = Math.abs(curr.close - curr.open);
     const nextBody = Math.abs(next.close - next.open);
 
     // Bullish OB: bearish candle followed by strong bullish impulse
@@ -417,8 +424,6 @@ function evaluateZones(zones: KeyZone[], candles: Candle[]): KeyZone[] {
 
     for (const c of candles) {
       if (c.time <= zone.startTime) continue;
-
-      const mid = (zone.top + zone.bottom) / 2;
 
       // Test: price touches zone but doesn't close through
       const touchesZone =

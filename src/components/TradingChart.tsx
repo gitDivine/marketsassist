@@ -90,25 +90,24 @@ function TradingChart({ pair, timeframe }: Props) {
     const canvas = overlayRef.current;
     const chart = chartRef.current;
     const series = candleSeriesRef.current;
-    if (!canvas || !chart || !series || !showKeyZones) {
-      if (canvas) {
-        const ctx = canvas.getContext("2d");
-        if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
-      }
-      return;
-    }
+    const container = containerRef.current;
+    if (!canvas || !chart || !series || !container) return;
 
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
+    // Size canvas to match the chart container exactly
     const ratio = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * ratio;
-    canvas.height = rect.height * ratio;
+    const containerRect = container.getBoundingClientRect();
+    canvas.width = containerRect.width * ratio;
+    canvas.height = containerRect.height * ratio;
+    canvas.style.width = containerRect.width + "px";
+    canvas.style.height = containerRect.height + "px";
     ctx.scale(ratio, ratio);
-    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.clearRect(0, 0, containerRect.width, containerRect.height);
 
-    const timeScale = chart.timeScale();
+    if (!showKeyZones || zonesRef.current.length === 0) return;
+
     const zones = filterActiveZones(
       zonesRef.current,
       lastPrice || 0
@@ -119,42 +118,42 @@ function TradingChart({ pair, timeframe }: Props) {
       const bottomY = series.priceToCoordinate(zone.bottom);
       if (topY === null || bottomY === null) continue;
 
-      const startX = timeScale.timeToCoordinate(zone.startTime as Time);
-      if (startX === null) continue;
-
+      // Draw from left edge to right edge (full width) for simplicity
+      // since timeToCoordinate can be unreliable for old timestamps
       const colors = ZONE_COLORS[zone.type] || ZONE_COLORS.support;
-      const strengthMult = Math.max(0.4, zone.strength / 100);
+      const strengthMult = Math.max(0.5, zone.strength / 100);
 
-      // Draw zone rectangle from startTime to right edge
-      const zoneHeight = Math.max(Math.abs(bottomY - topY), 2);
+      const zoneHeight = Math.max(Math.abs(bottomY - topY), 3);
       const y = Math.min(topY, bottomY);
-      const width = rect.width - startX;
 
-      if (width <= 0) continue;
+      // Full-width zone (from 0 to chart width minus price scale ~60px)
+      const chartWidth = containerRect.width - 60;
 
       // Fill
       ctx.globalAlpha = strengthMult;
       ctx.fillStyle = colors.bg;
-      ctx.fillRect(startX, y, width, zoneHeight);
+      ctx.fillRect(0, y, chartWidth, zoneHeight);
 
-      // Borders (top and bottom)
+      // Borders (top and bottom lines)
       ctx.strokeStyle = colors.border;
-      ctx.lineWidth = 1;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([4, 3]);
       ctx.beginPath();
-      ctx.moveTo(startX, y);
-      ctx.lineTo(startX + width, y);
-      ctx.moveTo(startX, y + zoneHeight);
-      ctx.lineTo(startX + width, y + zoneHeight);
+      ctx.moveTo(0, y);
+      ctx.lineTo(chartWidth, y);
+      ctx.moveTo(0, y + zoneHeight);
+      ctx.lineTo(chartWidth, y + zoneHeight);
       ctx.stroke();
+      ctx.setLineDash([]);
 
-      // Label
-      ctx.globalAlpha = Math.max(0.6, strengthMult);
-      ctx.font = "bold 9px system-ui, sans-serif";
+      // Label on the right side
+      ctx.globalAlpha = 0.9;
+      ctx.font = "bold 10px system-ui, sans-serif";
       ctx.fillStyle = colors.border;
-      const labelX = Math.max(startX + 4, rect.width - 50);
-      const labelY = y + Math.min(12, zoneHeight - 2);
-      if (zoneHeight > 8) {
-        ctx.fillText(colors.label, labelX, labelY);
+      if (zoneHeight > 10) {
+        const labelText = colors.label;
+        const labelWidth = ctx.measureText(labelText).width;
+        ctx.fillText(labelText, chartWidth - labelWidth - 8, y + Math.min(13, zoneHeight - 2));
       }
     }
 
@@ -289,10 +288,10 @@ function TradingChart({ pair, timeframe }: Props) {
         const { zones, swings } = detectAllKeyZones(candles);
         zonesRef.current = zones;
 
-        // Add swing point markers
+        // Add swing point markers — only recent significant ones
         const markers: SeriesMarker<Time>[] = swings
           .filter((s) => ["HH", "HL", "LH", "LL"].includes(s.label))
-          .slice(-30) // limit markers
+          .slice(-12) // only last 12 swings to avoid spam
           .map((s) => ({
             time: s.time as Time,
             position: s.type === "high" ? ("aboveBar" as const) : ("belowBar" as const),
@@ -325,8 +324,12 @@ function TradingChart({ pair, timeframe }: Props) {
 
     fetchCandles();
 
+    // Auto-refresh every 30 seconds for near-realtime updates
+    const interval = setInterval(fetchCandles, 30000);
+
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, [pair, timeframe, drawZones]);
 
