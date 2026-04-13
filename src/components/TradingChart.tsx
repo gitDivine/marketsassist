@@ -99,7 +99,9 @@ function TradingChart({ pair, timeframe }: Props) {
     }
 
     const tvSymbol = getTradingViewSymbol(pair);
-    const interval = TV_INTERVALS[timeframe];
+    // Default to 1H — user can change via TradingView's built-in TF selector
+    // without losing drawings. Our TF selector only controls pressure/verdict data.
+    const interval = "60";
 
     // Create container for the widget
     const widgetContainer = document.createElement("div");
@@ -139,7 +141,7 @@ function TradingChart({ pair, timeframe }: Props) {
       calendar: false,
       hide_volume: false,
       withdateranges: true,
-      details: true,
+      details: false,
       support_host: "https://www.tradingview.com",
       studies: [
         "RSI@tv-basicstudies",
@@ -154,7 +156,10 @@ function TradingChart({ pair, timeframe }: Props) {
         widgetRef.current = null;
       }
     };
-  }, [pair, timeframe]);
+  // Only reload widget when PAIR changes, not timeframe.
+  // This preserves drawings. User controls chart TF via TradingView's built-in selector.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pair]);
 
   return (
     <div
