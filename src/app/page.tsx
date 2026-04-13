@@ -8,10 +8,11 @@ import PairSelector from "@/components/PairSelector";
 import AssetClassTabs from "@/components/AssetClassTabs";
 import TimeframeSelector from "@/components/TimeframeSelector";
 import PressureGauge from "@/components/PressureGauge";
-import ConfluencePanel from "@/components/ConfluencePanel";
+import VerdictPanel from "@/components/VerdictPanel";
 import NewsPanel from "@/components/NewsPanel";
 import AnalysisNotes from "@/components/AnalysisNotes";
-import type { PairInfo, Timeframe, AssetClass, PressureData, ConfluenceResult, NewsItem } from "@/lib/types";
+import type { PairInfo, Timeframe, AssetClass, PressureData, NewsItem } from "@/lib/types";
+import type { VerdictResult } from "@/lib/analysis/verdict";
 import { cn } from "@/lib/utils";
 
 export default function Home() {
@@ -19,7 +20,7 @@ export default function Home() {
   const [selectedPair, setSelectedPair] = useState<PairInfo | null>(null);
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
   const [pressure, setPressure] = useState<PressureData | null>(null);
-  const [confluence, setConfluence] = useState<ConfluenceResult | null>(null);
+  const [verdict, setVerdict] = useState<VerdictResult | null>(null);
   const [news, setNews] = useState<NewsItem[]>([]);
   const [newsSentiment, setNewsSentiment] = useState<{
     overall: number;
@@ -37,7 +38,7 @@ export default function Home() {
     setAssetClass(cls);
     setSelectedPair(null);
     setPressure(null);
-    setConfluence(null);
+    setVerdict(null);
     setNews([]);
     setNewsSentiment(null);
   }, []);
@@ -56,14 +57,14 @@ export default function Home() {
     setLoading((l) => ({ ...l, pressure: false }));
   }, []);
 
-  const fetchConfluence = useCallback(async (pair: PairInfo) => {
+  const fetchVerdict = useCallback(async (pair: PairInfo) => {
     setLoading((l) => ({ ...l, confluence: true }));
     setErrors((e) => ({ ...e, confluence: false }));
     try {
       const res = await fetch(`/api/confluence?symbol=${encodeURIComponent(pair.symbol)}&class=${pair.class}&base=${encodeURIComponent(pair.base)}`);
       if (!res.ok) throw new Error("API error");
       const data = await res.json();
-      if (data.confluence) setConfluence(data.confluence);
+      if (data.verdict) setVerdict(data.verdict);
     } catch {
       setErrors((e) => ({ ...e, confluence: true }));
     }
@@ -89,10 +90,10 @@ export default function Home() {
   const fetchAll = useCallback(() => {
     if (!selectedPair) return;
     fetchPressure(selectedPair, timeframe);
-    fetchConfluence(selectedPair);
+    fetchVerdict(selectedPair);
     fetchNews(selectedPair, timeframe);
     setLastUpdate(new Date());
-  }, [selectedPair, timeframe, fetchPressure, fetchConfluence, fetchNews]);
+  }, [selectedPair, timeframe, fetchPressure, fetchVerdict, fetchNews]);
 
   // Refetch pressure + news when pair or timeframe changes
   useEffect(() => {
@@ -104,9 +105,9 @@ export default function Home() {
   // Refetch confluence when pair changes (confluence scans all TFs already)
   useEffect(() => {
     if (!selectedPair) return;
-    fetchConfluence(selectedPair);
+    fetchVerdict(selectedPair);
     setLastUpdate(new Date());
-  }, [selectedPair, fetchConfluence]);
+  }, [selectedPair, fetchVerdict]);
 
   useEffect(() => {
     if (!selectedPair) return;
@@ -175,11 +176,11 @@ export default function Home() {
           >
             <div className="space-y-4 lg:col-span-2 lg:space-y-5">
               <PressureGauge data={pressure} loading={loading.pressure} error={errors.pressure} onRetry={() => fetchPressure(selectedPair, timeframe)} />
-              <ConfluencePanel data={confluence} loading={loading.confluence} error={errors.confluence} onRetry={() => fetchConfluence(selectedPair)} />
+              <VerdictPanel data={verdict} loading={loading.confluence} error={errors.confluence} onRetry={() => fetchVerdict(selectedPair)} />
               <AnalysisNotes
                 pair={selectedPair.name}
                 pressure={pressure}
-                confluence={confluence}
+                confluence={null}
                 newsSentiment={newsSentiment?.overall || 0}
                 loading={loading.pressure || loading.confluence}
               />

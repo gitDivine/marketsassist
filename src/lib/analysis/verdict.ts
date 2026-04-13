@@ -1,34 +1,6 @@
 import type { Timeframe, PressureData } from "../types";
-
-// ─── Imported result types (from sibling analysis modules) ───────────────────
-// These will be defined in structure.ts and trend.ts respectively.
-// Declared here so the verdict engine can be built independently.
-
-export interface StructureResult {
-  type: "uptrend" | "downtrend" | "ranging";
-  strength: number; // 0-100
-  higherHighs: boolean;
-  lowerLows: boolean;
-  keyLevels: { price: number; type: "support" | "resistance" }[];
-}
-
-export interface TrendResult {
-  direction: "bullish" | "bearish" | "neutral";
-  strength: number; // 0-100
-  emaAlignment: boolean; // true = EMAs stacked in trend direction
-  adxValue: number;
-}
-
-export interface ShiftResult {
-  severity: "none" | "warning" | "confirmed";
-  type:
-    | "none"
-    | "trend_exhaustion"
-    | "momentum_divergence"
-    | "volume_climax"
-    | "structure_break";
-  description: string;
-}
+import type { StructureResult } from "./structure";
+import type { TrendResult, ShiftResult } from "./trend";
 
 // ─── Verdict types ───────────────────────────────────────────────────────────
 
@@ -84,24 +56,26 @@ const HIGHER_TFS: Timeframe[] = ["1d", "1w"];
 
 /** Convert structure result to -100..+100 score */
 function scoreStructure(s: StructureResult): number {
-  switch (s.type) {
+  switch (s.structure) {
     case "uptrend":
       return s.strength;
     case "downtrend":
       return -s.strength;
     case "ranging":
+    default:
       return 0;
   }
 }
 
 /** Convert trend result to -100..+100 score */
 function scoreTrend(t: TrendResult): number {
-  switch (t.direction) {
+  switch (t.trend) {
     case "bullish":
       return t.strength;
     case "bearish":
       return -t.strength;
     case "neutral":
+    default:
       return 0;
   }
 }
@@ -183,8 +157,8 @@ export function calculateVerdict(
 
   let htfOverride = 0;
   if (htfStructures.length >= 2) {
-    const allDown = htfStructures.every((a) => a.structure.type === "downtrend");
-    const allUp = htfStructures.every((a) => a.structure.type === "uptrend");
+    const allDown = htfStructures.every((a) => a.structure.structure === "downtrend");
+    const allUp = htfStructures.every((a) => a.structure.structure === "uptrend");
 
     if (allDown) {
       // Average strength of higher TF downtrends — pull final score toward bearish

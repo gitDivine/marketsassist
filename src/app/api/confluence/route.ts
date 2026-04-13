@@ -4,8 +4,11 @@ import { getYahooCandles, syntheticImbalance } from "@/lib/api/yahoo";
 import { getCryptoNews, getGoogleNews } from "@/lib/api/news";
 import { getSocialSentiment } from "@/lib/api/social";
 import { calculatePressure } from "@/lib/analysis/pressure";
-import { calculateConfluence } from "@/lib/analysis/confluence";
-import type { Timeframe, AssetClass, PressureData } from "@/lib/types";
+import { analyzeStructure } from "@/lib/analysis/structure";
+import { analyzeTrend, detectShift } from "@/lib/analysis/trend";
+import { calculateVerdict } from "@/lib/analysis/verdict";
+import type { TimeframeAnalysis } from "@/lib/analysis/verdict";
+import type { Timeframe, AssetClass } from "@/lib/types";
 
 const ALL_TIMEFRAMES: Timeframe[] = ["1m", "5m", "15m", "1h", "4h", "1d", "1w"];
 
@@ -25,26 +28,33 @@ export async function GET(request: NextRequest) {
       getCryptoNews(base).catch(() => []),
       getGoogleNews(base + " price").catch(() => []),
     ]);
-    const socialPromise = getSocialSentiment(base, assetClass).catch(() => ({ overall: 0, posts: [], sources: [] }));
+    const socialPromise = getSocialSentiment(base, assetClass).catch(() => ({
+      overall: 0,
+      posts: [],
+      sources: [],
+    }));
 
-    // For crypto (CoinGecko): fetch sequentially to avoid rate limits
-    // For Yahoo: can parallelize since batching already handles rate limits
-    const timeframePressures: { timeframe: Timeframe; pressure: PressureData }[] = [];
+    // Build full 4-dimension analysis per timeframe
+    const timeframeAnalyses: TimeframeAnalysis[] = [];
 
     if (assetClass === "crypto") {
-      // Sequential with small gaps to respect CoinGecko rate limit
       for (const tf of ALL_TIMEFRAMES) {
         try {
           const candles = await getCoinGeckoCandles(symbol.toLowerCase(), tf);
+          if (candles.length < 5) continue;
+
           const imbalance = syntheticOrderBookImbalance(candles);
           const pressure = calculatePressure(candles, imbalance);
-          timeframePressures.push({ timeframe: tf, pressure });
+          const structure = analyzeStructure(candles);
+          const trend = analyzeTrend(candles);
+          const shift = detectShift(structure.structure, trend.trend, pressure.trend);
+
+          timeframeAnalyses.push({ timeframe: tf, structure, trend, pressure, shift });
         } catch {
           // Skip failed timeframes
         }
       }
     } else {
-      // Yahoo can handle parallel
       const klinesResults = await Promise.allSettled(
         ALL_TIMEFRAMES.map((tf) => getYahooCandles(symbol, tf))
       );
@@ -52,9 +62,15 @@ export async function GET(request: NextRequest) {
         const result = klinesResults[i];
         if (result.status === "rejected") continue;
         const candles = result.value;
+        if (candles.length < 5) continue;
+
         const imbalance = syntheticImbalance(candles);
         const pressure = calculatePressure(candles, imbalance);
-        timeframePressures.push({ timeframe: ALL_TIMEFRAMES[i], pressure });
+        const structure = analyzeStructure(candles);
+        const trend = analyzeTrend(candles);
+        const shift = detectShift(structure.structure, trend.trend, pressure.trend);
+
+        timeframeAnalyses.push({ timeframe: ALL_TIMEFRAMES[i], structure, trend, pressure, shift });
       }
     }
 
@@ -70,7 +86,6 @@ export async function GET(request: NextRequest) {
       ? Math.round((newsScore / allNews.length) * 100)
       : 0;
 
-    // Combined sentiment: 50% news, 50% social (when available)
     let combinedSentiment = rawNewsSentiment;
     if (social.overall !== 0 && rawNewsSentiment !== 0) {
       combinedSentiment = Math.round(rawNewsSentiment * 0.5 + social.overall * 0.5);
@@ -78,11 +93,17 @@ export async function GET(request: NextRequest) {
       combinedSentiment = social.overall;
     }
 
-    const confluence = calculateConfluence(timeframePressures, combinedSentiment);
+    // Calculate verdict (replaces old confluence)
+    const verdict = calculateVerdict(timeframeAnalyses, combinedSentiment);
 
-    return NextResponse.json({ confluence, symbol, newsSentiment: combinedSentiment, socialSentiment: social });
+    return NextResponse.json({
+      verdict,
+      symbol,
+      newsSentiment: combinedSentiment,
+      socialSentiment: social,
+    });
   } catch (error) {
-    console.error(`Confluence calc failed for ${symbol}:`, error);
-    return NextResponse.json({ error: "Failed to calculate confluence" }, { status: 500 });
+    console.error(`Verdict calc failed for ${symbol}:`, error);
+    return NextResponse.json({ error: "Failed to calculate verdict" }, { status: 500 });
   }
 }
