@@ -5,6 +5,9 @@ import { Activity } from "lucide-react";
 export default function Header() {
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+      <div className="bg-accent/10 text-center text-[11px] font-medium text-accent py-1.5 px-3 sm:text-xs">
+        This site is currently in beta testing — features and data may be incomplete or change without notice.
+      </div>
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
         <div className="flex items-center gap-2.5">
           <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10">
