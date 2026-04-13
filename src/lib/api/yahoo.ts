@@ -1,98 +1,36 @@
 import type { PairInfo, Timeframe } from "../types";
 import type { Candle } from "../analysis/indicators";
 
-const BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
+const CHART_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
+const QUOTE_BASE = "https://query1.finance.yahoo.com/v7/finance/quote";
 
-// Yahoo timeframe mapping: interval + range
 const TF_CONFIG: Record<Timeframe, { interval: string; range: string }> = {
   "1m": { interval: "1m", range: "1d" },
   "5m": { interval: "5m", range: "1d" },
   "15m": { interval: "15m", range: "5d" },
   "1h": { interval: "1h", range: "5d" },
-  "4h": { interval: "1h", range: "1mo" },   // resample to 4h
+  "4h": { interval: "1h", range: "1mo" },
   "1d": { interval: "1d", range: "3mo" },
   "1w": { interval: "1wk", range: "1y" },
 };
 
-async function yFetch(url: string): Promise<Response> {
+async function yFetch(url: string, revalidate = 60): Promise<Response> {
   return fetch(url, {
-    next: { revalidate: 60 },
-    headers: {
-      "User-Agent": "Mozilla/5.0 (compatible; MarketAssist/1.0)",
-    },
+    next: { revalidate },
+    headers: { "User-Agent": "Mozilla/5.0 (compatible; MarketAssist/1.0)" },
     signal: AbortSignal.timeout(10000),
   });
 }
 
-// --- FOREX PAIRS ---
-const FOREX_PAIRS = [
-  { base: "EUR", quote: "USD" },
-  { base: "GBP", quote: "USD" },
-  { base: "USD", quote: "JPY" },
-  { base: "USD", quote: "CHF" },
-  { base: "AUD", quote: "USD" },
-  { base: "USD", quote: "CAD" },
-  { base: "NZD", quote: "USD" },
-  { base: "EUR", quote: "GBP" },
-  { base: "EUR", quote: "JPY" },
-  { base: "GBP", quote: "JPY" },
-  { base: "EUR", quote: "CHF" },
-  { base: "AUD", quote: "JPY" },
-  { base: "GBP", quote: "CHF" },
-  { base: "EUR", quote: "AUD" },
-  { base: "EUR", quote: "CAD" },
-  { base: "AUD", quote: "NZD" },
-  { base: "NZD", quote: "JPY" },
-  { base: "GBP", quote: "AUD" },
-  { base: "GBP", quote: "CAD" },
-  { base: "CHF", quote: "JPY" },
-  { base: "EUR", quote: "NZD" },
-  { base: "USD", quote: "SGD" },
-  { base: "USD", quote: "HKD" },
-  { base: "USD", quote: "ZAR" },
-  { base: "USD", quote: "MXN" },
+// --- ALL SYMBOLS ---
+const FOREX_SYMBOLS = [
+  "EURUSD=X", "GBPUSD=X", "USDJPY=X", "USDCHF=X", "AUDUSD=X",
+  "USDCAD=X", "NZDUSD=X", "EURGBP=X", "EURJPY=X", "GBPJPY=X",
+  "EURCHF=X", "AUDJPY=X", "GBPCHF=X", "EURAUD=X", "EURCAD=X",
+  "AUDNZD=X", "NZDJPY=X", "GBPAUD=X", "GBPCAD=X", "CHFJPY=X",
+  "EURNZD=X", "USDSGD=X", "USDHKD=X", "USDZAR=X", "USDMXN=X",
 ];
 
-export async function getForexPairs(): Promise<PairInfo[]> {
-  const results: PairInfo[] = [];
-
-  // Fetch prices for all forex pairs in parallel (batched)
-  const fetches = FOREX_PAIRS.map(async ({ base, quote }) => {
-    const yahooSymbol = `${base}${quote}=X`;
-    try {
-      const res = await yFetch(`${BASE}/${yahooSymbol}?interval=1d&range=2d`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      const meta = data.chart?.result?.[0]?.meta;
-      if (!meta) return null;
-
-      const price = meta.regularMarketPrice ?? 0;
-      const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? price;
-      const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
-
-      return {
-        symbol: yahooSymbol,
-        name: `${base}/${quote}`,
-        base,
-        quote,
-        class: "forex" as const,
-        price,
-        change24h: Math.round(change * 100) / 100,
-      };
-    } catch {
-      return null;
-    }
-  });
-
-  const all = await Promise.allSettled(fetches);
-  for (const r of all) {
-    if (r.status === "fulfilled" && r.value) results.push(r.value);
-  }
-
-  return results;
-}
-
-// --- STOCK INDICES ---
 const INDEX_SYMBOLS = [
   { symbol: "^GSPC", name: "S&P 500", base: "SPX" },
   { symbol: "^DJI", name: "Dow Jones", base: "DJI" },
@@ -103,7 +41,6 @@ const INDEX_SYMBOLS = [
   { symbol: "^FCHI", name: "CAC 40", base: "CAC" },
   { symbol: "^N225", name: "Nikkei 225", base: "N225" },
   { symbol: "^HSI", name: "Hang Seng", base: "HSI" },
-  { symbol: "000001.SS", name: "Shanghai", base: "SSEC" },
   { symbol: "^STOXX50E", name: "Euro Stoxx 50", base: "SX5E" },
   { symbol: "^BVSP", name: "Bovespa", base: "BVSP" },
   { symbol: "^AXJO", name: "ASX 200", base: "AXJO" },
@@ -111,44 +48,6 @@ const INDEX_SYMBOLS = [
   { symbol: "^NSEI", name: "Nifty 50", base: "NSEI" },
 ];
 
-export async function getIndexPairs(): Promise<PairInfo[]> {
-  const results: PairInfo[] = [];
-
-  const fetches = INDEX_SYMBOLS.map(async ({ symbol, name, base }) => {
-    try {
-      const res = await yFetch(`${BASE}/${encodeURIComponent(symbol)}?interval=1d&range=2d`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      const meta = data.chart?.result?.[0]?.meta;
-      if (!meta) return null;
-
-      const price = meta.regularMarketPrice ?? 0;
-      const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? price;
-      const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
-
-      return {
-        symbol,
-        name,
-        base,
-        quote: "USD",
-        class: "indices" as const,
-        price,
-        change24h: Math.round(change * 100) / 100,
-      };
-    } catch {
-      return null;
-    }
-  });
-
-  const all = await Promise.allSettled(fetches);
-  for (const r of all) {
-    if (r.status === "fulfilled" && r.value) results.push(r.value);
-  }
-
-  return results;
-}
-
-// --- TOP STOCKS ---
 const STOCK_SYMBOLS = [
   "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B",
   "JPM", "V", "JNJ", "WMT", "MA", "PG", "UNH", "HD", "DIS", "BAC",
@@ -158,53 +57,115 @@ const STOCK_SYMBOLS = [
   "IBM", "GE", "CAT", "BA", "MMM", "GS",
 ];
 
-export async function getStockPairs(): Promise<PairInfo[]> {
+// Use bulk quote endpoint — ONE request for all symbols
+async function bulkQuote(symbols: string[]): Promise<Map<string, { price: number; prevClose: number }>> {
+  const map = new Map<string, { price: number; prevClose: number }>();
+  try {
+    const joined = symbols.map(encodeURIComponent).join(",");
+    const res = await yFetch(
+      `${QUOTE_BASE}?symbols=${joined}&fields=regularMarketPrice,regularMarketPreviousClose,shortName`,
+      120
+    );
+    if (!res.ok) return map;
+
+    const data = await res.json();
+    const results = data.quoteResponse?.result || [];
+    for (const q of results) {
+      map.set(q.symbol, {
+        price: q.regularMarketPrice ?? 0,
+        prevClose: q.regularMarketPreviousClose ?? q.regularMarketPrice ?? 0,
+      });
+    }
+  } catch {
+    // Silently fail — individual markets will just be empty
+  }
+  return map;
+}
+
+export async function getForexPairs(): Promise<PairInfo[]> {
+  const quotes = await bulkQuote(FOREX_SYMBOLS);
   const results: PairInfo[] = [];
 
-  const fetches = STOCK_SYMBOLS.map(async (symbol) => {
-    try {
-      const res = await yFetch(`${BASE}/${symbol}?interval=1d&range=2d`);
-      if (!res.ok) return null;
-      const data = await res.json();
-      const meta = data.chart?.result?.[0]?.meta;
-      if (!meta) return null;
+  for (const sym of FOREX_SYMBOLS) {
+    const q = quotes.get(sym);
+    if (!q || q.price === 0) continue;
 
-      const price = meta.regularMarketPrice ?? 0;
-      const prevClose = meta.chartPreviousClose ?? meta.previousClose ?? price;
-      const change = prevClose > 0 ? ((price - prevClose) / prevClose) * 100 : 0;
+    const pair = sym.replace("=X", "");
+    const base = pair.slice(0, 3);
+    const quote = pair.slice(3);
+    const change = q.prevClose > 0 ? ((q.price - q.prevClose) / q.prevClose) * 100 : 0;
 
-      return {
-        symbol,
-        name: symbol,
-        base: symbol,
-        quote: "USD",
-        class: "stocks" as const,
-        price,
-        change24h: Math.round(change * 100) / 100,
-      };
-    } catch {
-      return null;
-    }
-  });
-
-  const all = await Promise.allSettled(fetches);
-  for (const r of all) {
-    if (r.status === "fulfilled" && r.value) results.push(r.value);
+    results.push({
+      symbol: sym,
+      name: `${base}/${quote}`,
+      base,
+      quote,
+      class: "forex",
+      price: q.price,
+      change24h: Math.round(change * 100) / 100,
+    });
   }
 
   return results;
 }
 
-// --- CANDLE DATA (works for any Yahoo symbol) ---
+export async function getIndexPairs(): Promise<PairInfo[]> {
+  const symbols = INDEX_SYMBOLS.map((i) => i.symbol);
+  const quotes = await bulkQuote(symbols);
+  const results: PairInfo[] = [];
+
+  for (const idx of INDEX_SYMBOLS) {
+    const q = quotes.get(idx.symbol);
+    if (!q || q.price === 0) continue;
+
+    const change = q.prevClose > 0 ? ((q.price - q.prevClose) / q.prevClose) * 100 : 0;
+
+    results.push({
+      symbol: idx.symbol,
+      name: idx.name,
+      base: idx.base,
+      quote: "USD",
+      class: "indices",
+      price: q.price,
+      change24h: Math.round(change * 100) / 100,
+    });
+  }
+
+  return results;
+}
+
+export async function getStockPairs(): Promise<PairInfo[]> {
+  const quotes = await bulkQuote(STOCK_SYMBOLS);
+  const results: PairInfo[] = [];
+
+  for (const sym of STOCK_SYMBOLS) {
+    const q = quotes.get(sym);
+    if (!q || q.price === 0) continue;
+
+    const change = q.prevClose > 0 ? ((q.price - q.prevClose) / q.prevClose) * 100 : 0;
+
+    results.push({
+      symbol: sym,
+      name: sym,
+      base: sym,
+      quote: "USD",
+      class: "stocks",
+      price: q.price,
+      change24h: Math.round(change * 100) / 100,
+    });
+  }
+
+  return results;
+}
+
+// --- CANDLE DATA (single symbol) ---
 export async function getYahooCandles(
   symbol: string,
   timeframe: Timeframe
 ): Promise<Candle[]> {
   const config = TF_CONFIG[timeframe];
   const encoded = encodeURIComponent(symbol);
-  const res = await yFetch(
-    `${BASE}/${encoded}?interval=${config.interval}&range=${config.range}`
-  );
+  const res = await yFetch(`${CHART_BASE}/${encoded}?interval=${config.interval}&range=${config.range}`, 30);
   if (!res.ok) throw new Error(`Yahoo chart failed for ${symbol}: ${res.status}`);
 
   const data = await res.json();
@@ -225,7 +186,6 @@ export async function getYahooCandles(
     if (o == null || h == null || l == null || c == null) continue;
 
     const vol = v ?? 0;
-    // Estimate buy volume from candle direction
     const buyRatio = c >= o
       ? 0.55 + Math.min(0.25, (c - o) / o * 3)
       : 0.45 - Math.min(0.25, (o - c) / o * 3);
@@ -241,9 +201,7 @@ export async function getYahooCandles(
     });
   }
 
-  // Resample 1h → 4h if needed
   if (timeframe === "4h") return resampleCandles(candles, 4);
-
   return candles;
 }
 
@@ -265,7 +223,6 @@ function resampleCandles(candles: Candle[], groupSize: number): Candle[] {
   return result;
 }
 
-// Synthetic order book imbalance from recent candle momentum
 export function syntheticImbalance(candles: Candle[]): number {
   if (candles.length < 5) return 0;
   const recent = candles.slice(-10);
