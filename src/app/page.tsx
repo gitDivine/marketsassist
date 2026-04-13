@@ -8,6 +8,7 @@ import PairSelector from "@/components/PairSelector";
 import AssetClassTabs from "@/components/AssetClassTabs";
 import TimeframeSelector from "@/components/TimeframeSelector";
 import PressureGauge from "@/components/PressureGauge";
+import TradingChart from "@/components/TradingChart";
 import VerdictPanel from "@/components/VerdictPanel";
 import NewsPanel from "@/components/NewsPanel";
 import AnalysisNotes from "@/components/AnalysisNotes";
@@ -172,6 +173,7 @@ export default function Home() {
           >
             <div className="space-y-4 lg:col-span-2 lg:space-y-5">
               <PressureGauge data={pressure} loading={loading.pressure} error={errors.pressure} onRetry={() => fetchPressure(selectedPair, timeframe)} />
+              <TradingChart pair={selectedPair} timeframe={timeframe} />
               <VerdictPanel data={verdict} loading={loading.confluence} error={errors.confluence} onRetry={() => fetchVerdict(selectedPair, timeframe)} selectedTimeframe={timeframe} />
               <AnalysisNotes
                 pair={selectedPair.name}
