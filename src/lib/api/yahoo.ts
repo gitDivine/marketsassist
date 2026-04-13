@@ -2,7 +2,6 @@ import type { PairInfo, Timeframe } from "../types";
 import type { Candle } from "../analysis/indicators";
 
 const CHART_BASE = "https://query1.finance.yahoo.com/v8/finance/chart";
-const QUOTE_BASE = "https://query1.finance.yahoo.com/v7/finance/quote";
 
 const TF_CONFIG: Record<Timeframe, { interval: string; range: string }> = {
   "1m": { interval: "1m", range: "1d" },
@@ -22,13 +21,59 @@ async function yFetch(url: string, revalidate = 60): Promise<Response> {
   });
 }
 
-// --- ALL SYMBOLS ---
+// Fetch price + prevClose from chart endpoint (v8, no auth needed)
+async function chartQuote(symbol: string): Promise<{ price: number; prevClose: number } | null> {
+  try {
+    const res = await yFetch(
+      `${CHART_BASE}/${encodeURIComponent(symbol)}?interval=1d&range=2d`,
+      120
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const meta = data.chart?.result?.[0]?.meta;
+    if (!meta) return null;
+    return {
+      price: meta.regularMarketPrice ?? 0,
+      prevClose: meta.chartPreviousClose ?? meta.previousClose ?? meta.regularMarketPrice ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+// Batch fetch in groups of N with delay between groups to avoid rate limits
+async function batchChartQuotes(
+  symbols: string[],
+  batchSize = 5,
+  delayMs = 300
+): Promise<Map<string, { price: number; prevClose: number }>> {
+  const map = new Map<string, { price: number; prevClose: number }>();
+
+  for (let i = 0; i < symbols.length; i += batchSize) {
+    const batch = symbols.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map((s) => chartQuote(s).then((r) => ({ symbol: s, data: r })))
+    );
+    for (const r of results) {
+      if (r.status === "fulfilled" && r.value.data && r.value.data.price > 0) {
+        map.set(r.value.symbol, r.value.data);
+      }
+    }
+    // Small delay between batches to respect rate limits
+    if (i + batchSize < symbols.length) {
+      await new Promise((r) => setTimeout(r, delayMs));
+    }
+  }
+
+  return map;
+}
+
+// --- SYMBOLS ---
 const FOREX_SYMBOLS = [
   "EURUSD=X", "GBPUSD=X", "USDJPY=X", "USDCHF=X", "AUDUSD=X",
   "USDCAD=X", "NZDUSD=X", "EURGBP=X", "EURJPY=X", "GBPJPY=X",
   "EURCHF=X", "AUDJPY=X", "GBPCHF=X", "EURAUD=X", "EURCAD=X",
   "AUDNZD=X", "NZDJPY=X", "GBPAUD=X", "GBPCAD=X", "CHFJPY=X",
-  "EURNZD=X", "USDSGD=X", "USDHKD=X", "USDZAR=X", "USDMXN=X",
 ];
 
 const INDEX_SYMBOLS = [
@@ -42,53 +87,23 @@ const INDEX_SYMBOLS = [
   { symbol: "^N225", name: "Nikkei 225", base: "N225" },
   { symbol: "^HSI", name: "Hang Seng", base: "HSI" },
   { symbol: "^STOXX50E", name: "Euro Stoxx 50", base: "SX5E" },
-  { symbol: "^BVSP", name: "Bovespa", base: "BVSP" },
-  { symbol: "^AXJO", name: "ASX 200", base: "AXJO" },
-  { symbol: "^KS11", name: "KOSPI", base: "KS11" },
-  { symbol: "^NSEI", name: "Nifty 50", base: "NSEI" },
 ];
 
 const STOCK_SYMBOLS = [
-  "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA", "BRK-B",
-  "JPM", "V", "JNJ", "WMT", "MA", "PG", "UNH", "HD", "DIS", "BAC",
-  "XOM", "NFLX", "COST", "ADBE", "CRM", "AMD", "INTC", "PYPL",
-  "PEP", "KO", "MRK", "ABT", "CSCO", "ACN", "ORCL", "MCD", "NKE",
-  "T", "VZ", "CMCSA", "QCOM", "TXN", "AVGO", "LLY", "TMO", "PM",
-  "IBM", "GE", "CAT", "BA", "MMM", "GS",
+  "AAPL", "MSFT", "GOOGL", "AMZN", "NVDA", "META", "TSLA",
+  "JPM", "V", "WMT", "MA", "UNH", "HD", "BAC",
+  "XOM", "NFLX", "ADBE", "CRM", "AMD", "INTC",
+  "PEP", "KO", "ORCL", "MCD", "NKE",
+  "QCOM", "AVGO", "LLY", "GS", "CAT",
 ];
 
-// Use bulk quote endpoint — ONE request for all symbols
-async function bulkQuote(symbols: string[]): Promise<Map<string, { price: number; prevClose: number }>> {
-  const map = new Map<string, { price: number; prevClose: number }>();
-  try {
-    const joined = symbols.map(encodeURIComponent).join(",");
-    const res = await yFetch(
-      `${QUOTE_BASE}?symbols=${joined}&fields=regularMarketPrice,regularMarketPreviousClose,shortName`,
-      120
-    );
-    if (!res.ok) return map;
-
-    const data = await res.json();
-    const results = data.quoteResponse?.result || [];
-    for (const q of results) {
-      map.set(q.symbol, {
-        price: q.regularMarketPrice ?? 0,
-        prevClose: q.regularMarketPreviousClose ?? q.regularMarketPrice ?? 0,
-      });
-    }
-  } catch {
-    // Silently fail — individual markets will just be empty
-  }
-  return map;
-}
-
 export async function getForexPairs(): Promise<PairInfo[]> {
-  const quotes = await bulkQuote(FOREX_SYMBOLS);
+  const quotes = await batchChartQuotes(FOREX_SYMBOLS, 5, 200);
   const results: PairInfo[] = [];
 
   for (const sym of FOREX_SYMBOLS) {
     const q = quotes.get(sym);
-    if (!q || q.price === 0) continue;
+    if (!q) continue;
 
     const pair = sym.replace("=X", "");
     const base = pair.slice(0, 3);
@@ -105,18 +120,17 @@ export async function getForexPairs(): Promise<PairInfo[]> {
       change24h: Math.round(change * 100) / 100,
     });
   }
-
   return results;
 }
 
 export async function getIndexPairs(): Promise<PairInfo[]> {
   const symbols = INDEX_SYMBOLS.map((i) => i.symbol);
-  const quotes = await bulkQuote(symbols);
+  const quotes = await batchChartQuotes(symbols, 5, 200);
   const results: PairInfo[] = [];
 
   for (const idx of INDEX_SYMBOLS) {
     const q = quotes.get(idx.symbol);
-    if (!q || q.price === 0) continue;
+    if (!q) continue;
 
     const change = q.prevClose > 0 ? ((q.price - q.prevClose) / q.prevClose) * 100 : 0;
 
@@ -130,17 +144,16 @@ export async function getIndexPairs(): Promise<PairInfo[]> {
       change24h: Math.round(change * 100) / 100,
     });
   }
-
   return results;
 }
 
 export async function getStockPairs(): Promise<PairInfo[]> {
-  const quotes = await bulkQuote(STOCK_SYMBOLS);
+  const quotes = await batchChartQuotes(STOCK_SYMBOLS, 5, 200);
   const results: PairInfo[] = [];
 
   for (const sym of STOCK_SYMBOLS) {
     const q = quotes.get(sym);
-    if (!q || q.price === 0) continue;
+    if (!q) continue;
 
     const change = q.prevClose > 0 ? ((q.price - q.prevClose) / q.prevClose) * 100 : 0;
 
@@ -154,11 +167,10 @@ export async function getStockPairs(): Promise<PairInfo[]> {
       change24h: Math.round(change * 100) / 100,
     });
   }
-
   return results;
 }
 
-// --- CANDLE DATA (single symbol) ---
+// --- CANDLE DATA ---
 export async function getYahooCandles(
   symbol: string,
   timeframe: Timeframe
