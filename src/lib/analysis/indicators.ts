@@ -107,3 +107,40 @@ export function calculateEMA(values: number[], period: number): number[] {
   }
   return ema;
 }
+
+// Momentum score: where is price relative to its moving averages?
+// Returns -100 (strongly bearish) to +100 (strongly bullish)
+export function calculateMomentumScore(candles: Candle[]): number {
+  if (candles.length < 20) return 0;
+
+  const closes = candles.map((c) => c.close);
+  const ema9 = calculateEMA(closes, 9);
+  const ema21 = calculateEMA(closes, 21);
+
+  const lastClose = closes[closes.length - 1];
+  const lastEma9 = ema9[ema9.length - 1];
+  const lastEma21 = ema21[ema21.length - 1];
+
+  let score = 0;
+
+  // Price vs EMA9: +/- 25
+  if (lastClose > lastEma9) score += 25;
+  else if (lastClose < lastEma9) score -= 25;
+
+  // Price vs EMA21: +/- 25
+  if (lastClose > lastEma21) score += 25;
+  else if (lastClose < lastEma21) score -= 25;
+
+  // EMA9 vs EMA21 (trend direction): +/- 30
+  if (lastEma9 > lastEma21) score += 30;
+  else if (lastEma9 < lastEma21) score -= 30;
+
+  // Recent price change (last 5 candles direction): +/- 20
+  const recentStart = closes[closes.length - 6] || closes[0];
+  const recentChange = (lastClose - recentStart) / recentStart;
+  if (recentChange > 0.005) score += 20;
+  else if (recentChange < -0.005) score -= 20;
+  else score += Math.round(recentChange * 4000); // proportional for small changes
+
+  return Math.max(-100, Math.min(100, score));
+}

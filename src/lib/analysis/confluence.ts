@@ -16,8 +16,8 @@ const LOWER_TFS: Timeframe[] = ["1m", "5m", "15m"];
 const HIGHER_TFS: Timeframe[] = ["1d", "1w"];
 
 function getTrend(pressure: PressureData): "bullish" | "bearish" | "neutral" {
-  if (pressure.buyPressure >= 58) return "bullish";
-  if (pressure.buyPressure <= 42) return "bearish";
+  if (pressure.buyPressure >= 55) return "bullish";
+  if (pressure.buyPressure <= 45) return "bearish";
   return "neutral";
 }
 
@@ -49,9 +49,9 @@ function detectDivergence(
   const htfAvgBuy = htfEntries.reduce((s, t) => s + t.pressure.buyPressure, 0) / htfEntries.length;
 
   const ltfTrend: "bullish" | "bearish" | "neutral" =
-    ltfAvgBuy >= 58 ? "bullish" : ltfAvgBuy <= 42 ? "bearish" : "neutral";
+    ltfAvgBuy >= 55 ? "bullish" : ltfAvgBuy <= 45 ? "bearish" : "neutral";
   const htfTrend: "bullish" | "bearish" | "neutral" =
-    htfAvgBuy >= 58 ? "bullish" : htfAvgBuy <= 42 ? "bearish" : "neutral";
+    htfAvgBuy >= 55 ? "bullish" : htfAvgBuy <= 45 ? "bearish" : "neutral";
 
   // No divergence if same direction or either neutral
   if (ltfTrend === htfTrend || ltfTrend === "neutral" || htfTrend === "neutral") {
@@ -153,10 +153,10 @@ export function calculateConfluence(
   const normalizedScore = totalWeight > 0 ? weightedScore / totalWeight : 0;
 
   let overallTrend: ConfluenceResult["overallTrend"] = "neutral";
-  if (normalizedScore > 0.3) overallTrend = "strong_bullish";
-  else if (normalizedScore > 0.1) overallTrend = "bullish";
-  else if (normalizedScore < -0.3) overallTrend = "strong_bearish";
-  else if (normalizedScore < -0.1) overallTrend = "bearish";
+  if (normalizedScore > 0.25) overallTrend = "strong_bullish";
+  else if (normalizedScore > 0.08) overallTrend = "bullish";
+  else if (normalizedScore < -0.25) overallTrend = "strong_bearish";
+  else if (normalizedScore < -0.08) overallTrend = "bearish";
 
   const total = timeframePressures.length;
   const maxAlignment = Math.max(bullishCount, bearishCount);

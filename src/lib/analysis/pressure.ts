@@ -1,4 +1,4 @@
-import { Candle, calculateRSI, calculateMFI, calculateVolumeProfile } from "./indicators";
+import { Candle, calculateRSI, calculateMFI, calculateVolumeProfile, calculateMomentumScore } from "./indicators";
 import type { PressureData } from "../types";
 
 // Generate synthetic volume from price range for assets with no volume (forex)
@@ -61,31 +61,34 @@ export function calculatePressure(candles: Candle[], orderBookImbalance = 0): Pr
   const rsi = calculateRSI(processedCandles);
   const mfi = calculateMFI(processedCandles);
   const volumeProfile = calculateVolumeProfile(processedCandles);
+  const momentum = calculateMomentumScore(processedCandles); // -100 to +100
 
-  const rsiScore = rsi;
-  const mfiScore = mfi;
-  const volumeScore = volumeProfile.ratio * 100;
-  const obScore = (orderBookImbalance + 1) * 50;
+  const rsiScore = rsi; // 0-100
+  const mfiScore = mfi; // 0-100
+  const volumeScore = volumeProfile.ratio * 100; // 0-100
+  const obScore = (orderBookImbalance + 1) * 50; // 0-100
+  const momentumScore = (momentum + 100) / 2; // -100..+100 → 0-100
 
-  // Adjust weights based on whether we have real volume
-  // With real volume: volume and MFI are meaningful
-  // Without: lean more on RSI and order book proxy
+  // Weights include momentum to anchor direction from price structure
+  // Momentum prevents the "always bullish" bias by checking actual trend direction
   const weights = hasRealVolume
-    ? { volume: 0.35, rsi: 0.2, mfi: 0.2, orderBook: 0.25 }
-    : { volume: 0.2, rsi: 0.35, mfi: 0.15, orderBook: 0.3 };
+    ? { volume: 0.25, rsi: 0.15, mfi: 0.15, orderBook: 0.15, momentum: 0.30 }
+    : { volume: 0.15, rsi: 0.20, mfi: 0.10, orderBook: 0.20, momentum: 0.35 };
 
   const buyPressure = Math.round(
     volumeScore * weights.volume +
     rsiScore * weights.rsi +
     mfiScore * weights.mfi +
-    obScore * weights.orderBook
+    obScore * weights.orderBook +
+    momentumScore * weights.momentum
   );
 
   const sellPressure = 100 - buyPressure;
 
+  // Tighter thresholds — 55/45 instead of 58/42
   let trend: PressureData["trend"] = "neutral";
-  if (buyPressure >= 58) trend = "bullish";
-  else if (buyPressure <= 42) trend = "bearish";
+  if (buyPressure >= 55) trend = "bullish";
+  else if (buyPressure <= 45) trend = "bearish";
 
   const strength = Math.abs(buyPressure - 50) * 2;
 
