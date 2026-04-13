@@ -1,7 +1,14 @@
 import type { Timeframe, PairInfo } from "../types";
 import type { Candle } from "../analysis/indicators";
 
-const BASE_URL = "https://api.binance.com/api/v3";
+// Binance has multiple API endpoints — try them in order as fallbacks
+const BINANCE_ENDPOINTS = [
+  "https://api1.binance.com/api/v3",
+  "https://api2.binance.com/api/v3",
+  "https://api3.binance.com/api/v3",
+  "https://api4.binance.com/api/v3",
+  "https://api.binance.com/api/v3",
+];
 
 const TF_MAP: Record<Timeframe, string> = {
   "1m": "1m",
@@ -13,9 +20,23 @@ const TF_MAP: Record<Timeframe, string> = {
   "1w": "1w",
 };
 
+async function fetchWithFallback(path: string, cacheSeconds = 30): Promise<Response> {
+  for (const base of BINANCE_ENDPOINTS) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        next: { revalidate: cacheSeconds },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok) return res;
+    } catch {
+      // try next endpoint
+    }
+  }
+  throw new Error(`All Binance endpoints failed for ${path}`);
+}
+
 export async function getBinancePairs(): Promise<PairInfo[]> {
-  const res = await fetch(`${BASE_URL}/ticker/24hr`, { next: { revalidate: 300 } });
-  if (!res.ok) throw new Error("Failed to fetch Binance pairs");
+  const res = await fetchWithFallback("/ticker/24hr", 300);
 
   const data: Array<{
     symbol: string;
@@ -25,7 +46,6 @@ export async function getBinancePairs(): Promise<PairInfo[]> {
     quoteVolume: string;
   }> = await res.json();
 
-  // Filter to USDT pairs with decent volume
   const usdtPairs = data
     .filter((t) => t.symbol.endsWith("USDT") && parseFloat(t.quoteVolume) > 100000)
     .sort((a, b) => parseFloat(b.quoteVolume) - parseFloat(a.quoteVolume))
@@ -48,11 +68,10 @@ export async function getBinanceKlines(
   limit = 100
 ): Promise<Candle[]> {
   const interval = TF_MAP[timeframe];
-  const res = await fetch(
-    `${BASE_URL}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
-    { next: { revalidate: 30 } }
+  const res = await fetchWithFallback(
+    `/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`,
+    30
   );
-  if (!res.ok) throw new Error(`Failed to fetch klines for ${symbol}`);
 
   const data: number[][] = await res.json();
 
@@ -71,10 +90,7 @@ export async function getBinanceOrderBook(
   symbol: string,
   limit = 20
 ): Promise<{ bidTotal: number; askTotal: number; imbalance: number }> {
-  const res = await fetch(`${BASE_URL}/depth?symbol=${symbol}&limit=${limit}`, {
-    next: { revalidate: 10 },
-  });
-  if (!res.ok) throw new Error(`Failed to fetch order book for ${symbol}`);
+  const res = await fetchWithFallback(`/depth?symbol=${symbol}&limit=${limit}`, 10);
 
   const data: { bids: string[][]; asks: string[][] } = await res.json();
 
