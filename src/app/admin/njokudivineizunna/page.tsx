@@ -112,7 +112,7 @@ export default function AdminDashboard() {
 
           {/* Analytics link */}
           <a
-            href="https://vercel.com/0xdivine-s-projects/market-pressure/analytics"
+            href="https://vercel.com/0xdivine-s-projects/marketsassist/analytics"
             target="_blank"
             rel="noopener noreferrer"
             className={cn(
