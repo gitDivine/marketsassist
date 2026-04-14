@@ -12,6 +12,9 @@ import TradingChart from "@/components/TradingChart";
 import VerdictPanel from "@/components/VerdictPanel";
 import NewsPanel from "@/components/NewsPanel";
 import TradeIdeas from "@/components/TradeIdeas";
+import { getExternalSymbol } from "@/components/TradeIdeas";
+import SessionClock from "@/components/SessionClock";
+import SentimentBadge from "@/components/SentimentBadge";
 import AnalysisNotes from "@/components/AnalysisNotes";
 import type { PairInfo, Timeframe, AssetClass, PressureData, NewsItem } from "@/lib/types";
 import type { VerdictResult } from "@/lib/analysis/verdict";
@@ -149,6 +152,18 @@ export default function Home() {
             )}
           </div>
           <TimeframeSelector selected={timeframe} onSelect={setTimeframe} />
+        </div>
+
+        {/* Session Clock + Sentiment */}
+        <div className="mb-4 flex flex-wrap items-center gap-3 sm:mb-5">
+          <SessionClock />
+          {selectedPair && newsSentiment && (
+            <SentimentBadge
+              symbol={getExternalSymbol(selectedPair)}
+              sentiment={newsSentiment.overall}
+              loading={loading.news}
+            />
+          )}
         </div>
 
         {!selectedPair ? (
