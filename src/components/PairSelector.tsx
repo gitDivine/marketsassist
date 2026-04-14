@@ -74,8 +74,14 @@ export default function PairSelector({ selected, onSelect, classFilter }: Props)
           <span className="skeleton h-5 w-28 rounded" />
         ) : selected ? (
           <>
-            <span className="font-semibold">{selected.base}</span>
-            <span className="text-muted">/{selected.quote}</span>
+            {selected.class === "indices" || selected.class === "stocks" ? (
+              <span className="font-semibold">{selected.name}</span>
+            ) : (
+              <>
+                <span className="font-semibold">{selected.base}</span>
+                <span className="text-muted">/{selected.quote}</span>
+              </>
+            )}
             {selected.price && (
               <span className="ml-1 hidden text-xs text-muted xs:inline">${formatPrice(selected.price)}</span>
             )}
@@ -160,8 +166,14 @@ export default function PairSelector({ selected, onSelect, classFilter }: Props)
                       )}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="font-medium">{pair.base}</span>
-                        <span className="text-xs text-muted">/{pair.quote}</span>
+                        {pair.class === "indices" || pair.class === "stocks" ? (
+                          <span className="font-medium">{pair.name}</span>
+                        ) : (
+                          <>
+                            <span className="font-medium">{pair.base}</span>
+                            <span className="text-xs text-muted">/{pair.quote}</span>
+                          </>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         {pair.price && (
