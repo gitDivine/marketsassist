@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { MessageSquare, ExternalLink, RefreshCw, Image as ImageIcon } from "lucide-react";
+import { MessageSquare, ExternalLink, RefreshCw, Image as ImageIcon, ClipboardList, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface FeedbackEntry {
@@ -39,12 +39,27 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [expandedImage, setExpandedImage] = useState<string | null>(null);
 
+  // Survey state
+  const [surveyQuestions, setSurveyQuestions] = useState<Array<{ id: string; type: string; question: string; options?: string[]; required: boolean; createdAt: string }>>([]);
+  const [surveyStats, setSurveyStats] = useState<Array<{ questionId: string; question: string; totalResponses: number; answers: Record<string, number> }>>([]);
+  const [newQ, setNewQ] = useState({ type: "multiple_choice" as string, question: "", options: ["", ""], required: false });
+  const [showCreateForm, setShowCreateForm] = useState(false);
+
   const fetchFeedback = useCallback(async () => {
     try {
-      const res = await fetch("/api/feedback");
-      if (!res.ok) throw new Error("Failed to fetch");
-      const data = await res.json();
-      setFeedback(data.feedback);
+      const [fbRes, svRes] = await Promise.all([
+        fetch("/api/feedback"),
+        fetch("/api/survey?admin=true"),
+      ]);
+      if (fbRes.ok) {
+        const fbData = await fbRes.json();
+        setFeedback(fbData.feedback);
+      }
+      if (svRes.ok) {
+        const svData = await svRes.json();
+        setSurveyQuestions(svData.questions || []);
+        setSurveyStats(svData.stats || []);
+      }
     } catch {
       // Silently fail on refresh
     } finally {
@@ -191,6 +206,181 @@ export default function AdminDashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        {/* Survey Management */}
+        <div className="flex items-center justify-between mt-8">
+          <h2 className="text-lg font-semibold flex items-center gap-2">
+            <ClipboardList className="h-5 w-5" />
+            Surveys
+          </h2>
+          <button
+            onClick={() => setShowCreateForm((v) => !v)}
+            className="flex items-center gap-1 text-xs bg-accent text-white rounded-lg px-3 py-1.5 font-medium hover:bg-accent/80 transition-colors"
+          >
+            <Plus className="h-3.5 w-3.5" />
+            New Question
+          </button>
+        </div>
+
+        {/* Create question form */}
+        {showCreateForm && (
+          <div className="rounded-xl bg-card border border-border p-4 space-y-3">
+            <div className="flex gap-2">
+              {(["multiple_choice", "text", "rating"] as const).map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setNewQ((q) => ({ ...q, type: t }))}
+                  className={cn(
+                    "rounded-lg px-3 py-1.5 text-xs font-medium transition-colors",
+                    newQ.type === t ? "bg-accent text-white" : "bg-card-hover text-muted hover:text-foreground"
+                  )}
+                >
+                  {t === "multiple_choice" ? "Multiple Choice" : t === "text" ? "Text" : "Rating (1-5)"}
+                </button>
+              ))}
+            </div>
+
+            <input
+              value={newQ.question}
+              onChange={(e) => setNewQ((q) => ({ ...q, question: e.target.value }))}
+              placeholder="Enter your question..."
+              className="w-full rounded-lg border border-border bg-background p-2.5 text-sm text-foreground placeholder:text-muted focus:outline-none focus:ring-2 focus:ring-accent/50"
+            />
+
+            {newQ.type === "multiple_choice" && (
+              <div className="space-y-2">
+                {newQ.options.map((opt, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      value={opt}
+                      onChange={(e) => {
+                        const opts = [...newQ.options];
+                        opts[i] = e.target.value;
+                        setNewQ((q) => ({ ...q, options: opts }));
+                      }}
+                      placeholder={`Option ${i + 1}`}
+                      className="flex-1 rounded-lg border border-border bg-background p-2 text-sm text-foreground placeholder:text-muted focus:outline-none"
+                    />
+                    {newQ.options.length > 2 && (
+                      <button
+                        onClick={() => setNewQ((q) => ({ ...q, options: q.options.filter((_, j) => j !== i) }))}
+                        className="text-red hover:text-red/70 p-1"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+                {newQ.options.length < 8 && (
+                  <button
+                    onClick={() => setNewQ((q) => ({ ...q, options: [...q.options, ""] }))}
+                    className="text-xs text-accent hover:text-accent/70"
+                  >
+                    + Add option
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  checked={newQ.required}
+                  onChange={(e) => setNewQ((q) => ({ ...q, required: e.target.checked }))}
+                  className="rounded"
+                />
+                Required
+              </label>
+              <button
+                onClick={async () => {
+                  if (!newQ.question.trim()) return;
+                  const body: Record<string, unknown> = {
+                    action: "create_question",
+                    type: newQ.type,
+                    question: newQ.question.trim(),
+                    required: newQ.required,
+                  };
+                  if (newQ.type === "multiple_choice") {
+                    body.options = newQ.options.filter((o) => o.trim());
+                  }
+                  await fetch("/api/survey", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(body),
+                  });
+                  setNewQ({ type: "multiple_choice", question: "", options: ["", ""], required: false });
+                  setShowCreateForm(false);
+                  fetchFeedback();
+                }}
+                disabled={!newQ.question.trim()}
+                className="bg-accent text-white rounded-lg px-4 py-1.5 text-sm font-medium hover:bg-accent/80 disabled:opacity-40 transition-colors"
+              >
+                Create Question
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Active questions + responses */}
+        {surveyQuestions.length === 0 ? (
+          <div className="text-center py-8 text-muted text-sm">
+            No survey questions yet. Create one above.
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {surveyQuestions.map((q) => {
+              const stats = surveyStats.find((s) => s.questionId === q.id);
+              return (
+                <div key={q.id} className="rounded-xl bg-card border border-border p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <span className="inline-block rounded bg-accent/15 px-2 py-0.5 text-[10px] font-medium text-accent uppercase mb-1">
+                        {q.type.replace("_", " ")}
+                      </span>
+                      <p className="text-sm font-medium text-foreground">{q.question}</p>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        await fetch("/api/survey", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ action: "delete_question", questionId: q.id }),
+                        });
+                        fetchFeedback();
+                      }}
+                      className="text-red/60 hover:text-red p-1 transition-colors"
+                      title="Delete question"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {stats && stats.totalResponses > 0 ? (
+                    <div className="space-y-1.5">
+                      <p className="text-xs text-muted">{stats.totalResponses} response{stats.totalResponses !== 1 ? "s" : ""}</p>
+                      {Object.entries(stats.answers)
+                        .sort(([, a], [, b]) => b - a)
+                        .map(([answer, count]) => (
+                          <div key={answer} className="flex items-center gap-2">
+                            <div className="flex-1 rounded-full bg-card-hover h-5 overflow-hidden">
+                              <div
+                                className="h-full bg-accent/30 rounded-full"
+                                style={{ width: `${Math.round((count / stats.totalResponses) * 100)}%` }}
+                              />
+                            </div>
+                            <span className="text-xs text-foreground min-w-[80px] truncate">{answer}</span>
+                            <span className="text-xs text-muted tabular-nums">{Math.round((count / stats.totalResponses) * 100)}%</span>
+                          </div>
+                        ))}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted">No responses yet</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </main>

@@ -108,8 +108,7 @@ export default function FeedbackWidget() {
         )}
       >
         <MessageSquare className="h-4 w-4" />
-        <span className="hidden sm:inline">Feedback</span>
-        <span className="sm:hidden">💬</span>
+        <span>Give Feedback</span>
       </button>
 
       {/* Backdrop */}
