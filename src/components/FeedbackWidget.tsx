@@ -16,16 +16,14 @@ const MAX_IMAGE_SIZE = 500 * 1024; // 500KB
 export default function FeedbackWidget() {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
-  const [image, setImage] = useState<string | null>(null);
-  const [imageName, setImageName] = useState<string | null>(null);
+  const [images, setImages] = useState<{ data: string; name: string }[]>([]);
   const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
 
   const reset = useCallback(() => {
     setText("");
-    setImage(null);
-    setImageName(null);
+    setImages([]);
     setStatus("idle");
     setErrorMsg("");
   }, []);
@@ -45,26 +43,31 @@ export default function FeedbackWidget() {
   }, [status, handleClose]);
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    const files = e.target.files;
+    if (!files) return;
 
-    if (file.size > MAX_IMAGE_SIZE) {
-      setErrorMsg("Image must be under 500KB.");
-      return;
+    for (const file of Array.from(files)) {
+      if (images.length >= 5) {
+        setErrorMsg("Maximum 5 images allowed.");
+        break;
+      }
+      if (file.size > MAX_IMAGE_SIZE) {
+        setErrorMsg(`${file.name} is over 500KB — skipped.`);
+        continue;
+      }
+      if (!file.type.startsWith("image/")) {
+        continue;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setImages((prev) => {
+          if (prev.length >= 5) return prev;
+          return [...prev, { data: reader.result as string, name: file.name }];
+        });
+        setErrorMsg("");
+      };
+      reader.readAsDataURL(file);
     }
-
-    if (!file.type.startsWith("image/")) {
-      setErrorMsg("Only image files are accepted.");
-      return;
-    }
-
-    setErrorMsg("");
-    const reader = new FileReader();
-    reader.onload = () => {
-      setImage(reader.result as string);
-      setImageName(file.name);
-    };
-    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async () => {
@@ -78,7 +81,7 @@ export default function FeedbackWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: text.trim(),
-          image: image || undefined,
+          images: images.length > 0 ? images.map((i) => i.data) : undefined,
           page: typeof window !== "undefined" ? window.location.pathname : "/",
         }),
       });
@@ -200,29 +203,30 @@ export default function FeedbackWidget() {
                   </div>
 
                   {/* Image upload */}
-                  {image ? (
-                    <div className="relative inline-block">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={image}
-                        alt="Uploaded preview"
-                        className="h-20 w-20 rounded-lg object-cover border border-border"
-                      />
-                      <button
-                        onClick={() => {
-                          setImage(null);
-                          setImageName(null);
-                          if (fileRef.current) fileRef.current.value = "";
-                        }}
-                        className="absolute -top-2 -right-2 rounded-full bg-destructive text-destructive-foreground p-0.5"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                      <p className="text-xs text-muted-foreground mt-1 truncate max-w-[80px]">
-                        {imageName}
-                      </p>
+                  {images.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                      {images.map((img, i) => (
+                        <div key={i} className="relative inline-block">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={img.data}
+                            alt={`Upload ${i + 1}`}
+                            className="h-16 w-16 rounded-lg object-cover border border-border"
+                          />
+                          <button
+                            onClick={() => {
+                              setImages((prev) => prev.filter((_, j) => j !== i));
+                              if (fileRef.current) fileRef.current.value = "";
+                            }}
+                            className="absolute -top-1.5 -right-1.5 rounded-full bg-destructive text-destructive-foreground p-0.5"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
-                  ) : (
+                  )}
+                  {images.length < 5 && (
                     <button
                       onClick={() => fileRef.current?.click()}
                       className={cn(
@@ -231,7 +235,7 @@ export default function FeedbackWidget() {
                       )}
                     >
                       <Upload className="h-3.5 w-3.5" />
-                      Attach a screenshot (optional, max 500KB)
+                      {images.length === 0 ? "Attach screenshots (optional, max 5)" : `Add more (${images.length}/5)`}
                     </button>
                   )}
 
@@ -239,6 +243,7 @@ export default function FeedbackWidget() {
                     ref={fileRef}
                     type="file"
                     accept="image/*"
+                    multiple
                     className="hidden"
                     onChange={handleImageUpload}
                   />

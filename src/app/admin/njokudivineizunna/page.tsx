@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 interface FeedbackEntry {
   id: string;
   text: string;
-  image: string | null;
+  images: string[];
   createdAt: string;
   userAgent: string;
   page: string;
@@ -174,30 +174,35 @@ export default function AdminDashboard() {
                   {entry.text}
                 </p>
 
-                {entry.image && (
-                  <button
-                    onClick={() => setExpandedImage(entry.image)}
-                    className="block"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={entry.image}
-                      alt="Feedback attachment"
-                      className="h-16 w-16 rounded-lg object-cover border border-border hover:opacity-80 transition-opacity"
-                    />
-                  </button>
+                {entry.images && entry.images.length > 0 && (
+                  <div className="flex flex-wrap gap-2">
+                    {entry.images.map((img, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setExpandedImage(img)}
+                        className="block"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={img}
+                          alt={`Attachment ${i + 1}`}
+                          className="h-16 w-16 rounded-lg object-cover border border-border hover:opacity-80 transition-opacity"
+                        />
+                      </button>
+                    ))}
+                  </div>
                 )}
 
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span>{timeAgo(entry.createdAt)}</span>
                   <span>·</span>
                   <span>{entry.page}</span>
-                  {entry.image && (
+                  {entry.images && entry.images.length > 0 && (
                     <>
                       <span>·</span>
                       <span className="flex items-center gap-1">
                         <ImageIcon className="h-3 w-3" />
-                        image
+                        {entry.images.length} image{entry.images.length > 1 ? "s" : ""}
                       </span>
                     </>
                   )}

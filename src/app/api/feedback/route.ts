@@ -4,7 +4,7 @@ import Redis from "ioredis";
 interface FeedbackEntry {
   id: string;
   text: string;
-  image: string | null;
+  images: string[];
   createdAt: string;
   userAgent: string;
   page: string;
@@ -32,9 +32,9 @@ function getRedis(): Redis {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { text, image, page } = body as {
+    const { text, images, page } = body as {
       text?: string;
-      image?: string;
+      images?: string[];
       page?: string;
     };
 
@@ -46,17 +46,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `Text must be under ${MAX_TEXT_LENGTH} characters.` }, { status: 400 });
     }
 
-    if (image && typeof image === "string") {
-      const sizeEstimate = Math.ceil((image.length * 3) / 4);
-      if (sizeEstimate > MAX_IMAGE_SIZE) {
-        return NextResponse.json({ error: "Image must be under 500KB." }, { status: 400 });
+    const validImages: string[] = [];
+    if (Array.isArray(images)) {
+      for (const img of images.slice(0, 5)) {
+        if (typeof img !== "string") continue;
+        const sizeEstimate = Math.ceil((img.length * 3) / 4);
+        if (sizeEstimate > MAX_IMAGE_SIZE) {
+          return NextResponse.json({ error: "Each image must be under 500KB." }, { status: 400 });
+        }
+        validImages.push(img);
       }
     }
 
     const entry: FeedbackEntry = {
       id: `fb_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
       text: text.trim(),
-      image: image && typeof image === "string" ? image : null,
+      images: validImages,
       createdAt: new Date().toISOString(),
       userAgent: (req.headers.get("user-agent") || "unknown").slice(0, 200),
       page: typeof page === "string" ? page : "/",
