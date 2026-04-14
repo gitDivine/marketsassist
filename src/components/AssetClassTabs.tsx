@@ -1,6 +1,6 @@
 "use client";
 
-import { BarChart3, DollarSign, TrendingUp, Layers } from "lucide-react";
+import { BarChart3, DollarSign, TrendingUp, Layers, PieChart, Landmark } from "lucide-react";
 import type { AssetClass } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +15,8 @@ const TABS: { value: AssetClass | "all"; label: string; icon: typeof BarChart3 }
   { value: "forex", label: "Forex", icon: DollarSign },
   { value: "stocks", label: "Stocks", icon: TrendingUp },
   { value: "indices", label: "Indices", icon: BarChart3 },
+  { value: "funds", label: "Funds", icon: PieChart },
+  { value: "bonds", label: "Bonds", icon: Landmark },
 ];
 
 export default function AssetClassTabs({ selected, onSelect }: Props) {

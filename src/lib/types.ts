@@ -1,4 +1,4 @@
-export type AssetClass = "crypto" | "forex" | "stocks" | "indices";
+export type AssetClass = "crypto" | "forex" | "stocks" | "indices" | "funds" | "bonds";
 
 export type Timeframe = "1m" | "5m" | "15m" | "1h" | "4h" | "1d" | "1w";
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCoinGeckoPairs } from "@/lib/api/coingecko";
-import { getForexPairs, getStockPairs, getIndexPairs } from "@/lib/api/yahoo";
+import { getForexPairs, getStockPairs, getIndexPairs, getFundPairs, getBondPairs } from "@/lib/api/yahoo";
 import type { AssetClass } from "@/lib/types";
 
 export async function GET(request: NextRequest) {
@@ -9,11 +9,13 @@ export async function GET(request: NextRequest) {
 
   try {
     // Fetch all markets in parallel
-    const [crypto, forex, stocks, indices] = await Promise.allSettled([
+    const [crypto, forex, stocks, indices, funds, bonds] = await Promise.allSettled([
       getCoinGeckoPairs(),
       getForexPairs(),
       getStockPairs(),
       getIndexPairs(),
+      getFundPairs(),
+      getBondPairs(),
     ]);
 
     const allPairs = [
@@ -21,6 +23,8 @@ export async function GET(request: NextRequest) {
       ...(forex.status === "fulfilled" ? forex.value : []),
       ...(stocks.status === "fulfilled" ? stocks.value : []),
       ...(indices.status === "fulfilled" ? indices.value : []),
+      ...(funds.status === "fulfilled" ? funds.value : []),
+      ...(bonds.status === "fulfilled" ? bonds.value : []),
     ];
 
     const filtered = classFilter

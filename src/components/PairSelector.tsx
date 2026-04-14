@@ -74,7 +74,7 @@ export default function PairSelector({ selected, onSelect, classFilter }: Props)
           <span className="skeleton h-5 w-28 rounded" />
         ) : selected ? (
           <>
-            {selected.class === "indices" || selected.class === "stocks" ? (
+            {selected.class === "indices" || selected.class === "stocks" || selected.class === "funds" || selected.class === "bonds" ? (
               <span className="font-semibold">{selected.name}</span>
             ) : (
               <>
@@ -166,7 +166,7 @@ export default function PairSelector({ selected, onSelect, classFilter }: Props)
                       )}
                     >
                       <div className="flex items-center gap-2">
-                        {pair.class === "indices" || pair.class === "stocks" ? (
+                        {pair.class === "indices" || pair.class === "stocks" || pair.class === "funds" || pair.class === "bonds" ? (
                           <span className="font-medium">{pair.name}</span>
                         ) : (
                           <>

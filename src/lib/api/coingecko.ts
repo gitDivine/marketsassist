@@ -41,20 +41,35 @@ async function cgFetch(url: string, revalidate = 60): Promise<Response> {
 }
 
 export async function getCoinGeckoPairs(): Promise<PairInfo[]> {
-  const res = await cgFetch(
-    `${BASE}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=200&page=1&sparkline=false&price_change_percentage=24h`,
-    120
-  );
-  if (!res.ok) throw new Error(`CoinGecko markets failed: ${res.status}`);
+  // Fetch 2 pages of 250 for ~500 crypto pairs
+  const [res1, res2] = await Promise.allSettled([
+    cgFetch(
+      `${BASE}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=1&sparkline=false&price_change_percentage=24h`,
+      120
+    ),
+    cgFetch(
+      `${BASE}/coins/markets?vs_currency=usd&order=market_cap_desc&per_page=250&page=2&sparkline=false&price_change_percentage=24h`,
+      120
+    ),
+  ]);
 
-  const data: Array<{
+  type CoinData = {
     id: string;
     symbol: string;
     name: string;
     current_price: number;
     price_change_percentage_24h: number;
     total_volume: number;
-  }> = await res.json();
+  };
+
+  let data: CoinData[] = [];
+  if (res1.status === "fulfilled" && res1.value.ok) {
+    data = data.concat(await res1.value.json());
+  }
+  if (res2.status === "fulfilled" && res2.value.ok) {
+    data = data.concat(await res2.value.json());
+  }
+  if (data.length === 0) throw new Error("CoinGecko markets failed");
 
   const stablecoins = new Set(["usdt", "usdc", "dai", "busd", "tusd", "usdp", "frax", "usdd", "gusd", "pyusd", "fdusd"]);
 
