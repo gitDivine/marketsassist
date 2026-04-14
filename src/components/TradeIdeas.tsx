@@ -78,14 +78,14 @@ function TradeIdeas({ pair }: Props) {
       icon: "𝕏",
       color: "from-zinc-500/20 to-zinc-600/10 border-zinc-500/30 hover:border-zinc-400/50",
       textColor: "text-zinc-300",
-      url: `https://twitter.com/search?q=${encodeURIComponent(sym + " trading")}&f=live`,
+      url: `https://twitter.com/search?q=${encodeURIComponent(sym)}&f=live`,
     },
     {
       name: "YouTube",
       icon: "▶",
       color: "from-red-500/20 to-red-600/10 border-red-500/30 hover:border-red-400/50",
       textColor: "text-red-400",
-      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(sym + " analysis")}`,
+      url: `https://www.youtube.com/results?search_query=${encodeURIComponent(sym)}`,
     },
   ];
 
