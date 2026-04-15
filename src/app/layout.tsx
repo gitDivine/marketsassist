@@ -35,9 +35,9 @@ export default function RootLayout({
         <Analytics />
         <FeedbackWidget />
         {/* DEV WATERMARK — NEVER merge this to master */}
-        <div className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center opacity-15">
-          <div className="h-72 w-72 rounded-full border-[4px] border-red flex items-center justify-center">
-            <span className="text-red text-2xl font-black uppercase tracking-widest -rotate-12">DEV MODE</span>
+        <div className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center opacity-[0.07]">
+          <div className="h-72 w-72 rounded-full border-[3px] border-white flex items-center justify-center">
+            <span className="text-white text-2xl font-black uppercase tracking-widest -rotate-12">DEV MODE</span>
           </div>
         </div>
       </body>
