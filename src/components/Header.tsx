@@ -9,8 +9,9 @@ export default function Header() {
       <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4">
         <div className="flex items-center gap-2.5">
           {/* MA Logo */}
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.svg" alt="MA" className="h-9 w-9 rounded-lg shadow-md shadow-accent/25" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent shadow-md shadow-accent/25">
+            <span className="text-xs font-black text-white tracking-tight">MA</span>
+          </div>
           <div>
             <h1 className="flex items-center gap-1.5 text-sm font-bold tracking-tight">Markets Assist <span className="rounded-md bg-accent/15 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-widest text-accent">Beta</span></h1>
             <p className="text-[10px] text-muted">Buy vs Sell Pressure — Multi-TF Confluence</p>
