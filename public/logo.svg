@@ -1,11 +1,33 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
-  <rect width="64" height="64" rx="16" fill="#6366f1"/>
-  <rect width="64" height="64" rx="16" fill="url(#g)" opacity="0.3"/>
-  <text x="32" y="42" text-anchor="middle" font-family="system-ui,-apple-system,sans-serif" font-weight="900" font-size="28" fill="white" letter-spacing="-1">MA</text>
+  <!-- Background with deep gradient -->
+  <rect width="64" height="64" rx="14" fill="url(#bg)"/>
+  <!-- Subtle inner glow -->
+  <rect x="2" y="2" width="60" height="60" rx="12" fill="url(#glow)" opacity="0.15"/>
+  <!-- Pulse line across the middle -->
+  <polyline points="6,38 16,38 20,28 24,42 28,24 32,38 36,32 40,36 44,26 48,38 58,38"
+    stroke="url(#pulse)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.25"/>
+  <!-- M letter - bold geometric strokes -->
+  <path d="M11,48 L11,22 L20.5,35 L30,22 L30,48"
+    stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- A letter - bold geometric strokes -->
+  <path d="M34,48 L44,20 L54,48 M38,38 L50,38"
+    stroke="white" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <!-- Green accent dot (market pulse) -->
+  <circle cx="44" cy="14" r="2.5" fill="#22c55e"/>
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="64" y2="64">
-      <stop offset="0%" stop-color="#818cf8"/>
+    <linearGradient id="bg" x1="0" y1="0" x2="64" y2="64">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="50%" stop-color="#4f46e5"/>
+      <stop offset="100%" stop-color="#3730a3"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="0" x2="64" y2="64">
+      <stop offset="0%" stop-color="#a5b4fc"/>
       <stop offset="100%" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="6" y1="32" x2="58" y2="32">
+      <stop offset="0%" stop-color="#22c55e" stop-opacity="0"/>
+      <stop offset="50%" stop-color="#22c55e"/>
+      <stop offset="100%" stop-color="#22c55e" stop-opacity="0"/>
     </linearGradient>
   </defs>
 </svg>
