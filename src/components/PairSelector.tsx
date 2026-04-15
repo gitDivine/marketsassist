@@ -147,6 +147,13 @@ export default function PairSelector({ selected, onSelect, classFilter }: Props)
                 </button>
               </div>
 
+              {/* Search hint */}
+              {!search.trim() && (
+                <div className="px-3 py-1.5 text-[10px] text-accent/70 bg-accent/5 border-b border-border">
+                  Not all pairs are shown — type to search 500+ assets
+                </div>
+              )}
+
               {/* Pair list */}
               <div className="overflow-y-auto overscroll-contain p-1.5" style={{ maxHeight: "calc(85vh - 60px)" }}>
                 {filtered.length === 0 ? (
