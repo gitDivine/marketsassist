@@ -34,6 +34,12 @@ export default function RootLayout({
         {children}
         <Analytics />
         <FeedbackWidget />
+        {/* DEV TEST */}
+        <div className="fixed inset-0 z-[9999] pointer-events-none flex items-center justify-center">
+          <div className="h-80 w-80 rounded-full border-[6px] border-red/40 flex items-center justify-center">
+            <span className="text-red/50 text-3xl font-black uppercase tracking-widest -rotate-12">DEV MODE</span>
+          </div>
+        </div>
       </body>
     </html>
   );
