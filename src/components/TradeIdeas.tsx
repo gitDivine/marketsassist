@@ -122,23 +122,43 @@ function TradeIdeas({ pair }: Props) {
         <p className="mb-3 text-[10px] text-muted sm:text-[11px]">
           Click to see upcoming news events for this pair
         </p>
-        <a
-          href={`https://www.forexfactory.com/market/${sym.toLowerCase()}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="group flex items-center justify-between rounded-xl border border-amber-500/30 bg-gradient-to-b from-amber-500/15 to-amber-600/5 p-3 transition-all hover:border-amber-400/50 active:scale-[0.98] sm:p-4"
-        >
-          <div className="flex items-center gap-3">
-            <span className="text-xl sm:text-2xl">📅</span>
-            <div>
-              <span className="text-xs font-medium text-amber-400 sm:text-sm">
-                ForexFactory Calendar
-              </span>
-              <p className="text-[10px] text-muted">{sym} events & news impact</p>
+        <div className="flex flex-col gap-2">
+          <a
+            href={`https://www.forexfactory.com/market/${sym.toLowerCase()}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center justify-between rounded-xl border border-amber-500/30 bg-gradient-to-b from-amber-500/15 to-amber-600/5 p-3 transition-all hover:border-amber-400/50 active:scale-[0.98] sm:p-4"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl sm:text-2xl">📅</span>
+              <div>
+                <span className="text-xs font-medium text-amber-400 sm:text-sm">
+                  ForexFactory Calendar
+                </span>
+                <p className="text-[10px] text-muted">{sym} events & news impact</p>
+              </div>
             </div>
-          </div>
-          <ExternalLink className="h-4 w-4 text-muted opacity-50 transition-opacity group-hover:opacity-100" />
-        </a>
+            <ExternalLink className="h-4 w-4 text-muted opacity-50 transition-opacity group-hover:opacity-100" />
+          </a>
+
+          <a
+            href={`https://www.forex.com/en-us/search-results/?crawler_forex_com_en_us%5Bquery%5D=${sym}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="group flex items-center justify-between rounded-xl border border-emerald-500/30 bg-gradient-to-b from-emerald-500/15 to-emerald-600/5 p-3 transition-all hover:border-emerald-400/50 active:scale-[0.98] sm:p-4"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-xl sm:text-2xl">📰</span>
+              <div>
+                <span className="text-xs font-medium text-emerald-400 sm:text-sm">
+                  Forex.com News
+                </span>
+                <p className="text-[10px] text-muted">{sym} latest news & updates</p>
+              </div>
+            </div>
+            <ExternalLink className="h-4 w-4 text-muted opacity-50 transition-opacity group-hover:opacity-100" />
+          </a>
+        </div>
       </div>
     </div>
   );
