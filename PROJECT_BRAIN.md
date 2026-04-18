@@ -53,7 +53,7 @@ src/
 - [x] UI components
 - [x] Build passes (zero errors)
 - [x] GitHub repo created
-- [ ] Vercel deployment
+- [x] Vercel deployment completed (marketsassist.vercel.app & dev0xdivine-marketsassist.vercel.app)
 - [ ] Forex/stocks expansion (future)
 
 ## Blockers
@@ -66,3 +66,10 @@ None currently.
 - Three divergence types: early_breakout (1.8x boost), momentum_shift (1.4x), potential_reversal (1.15x)
 - Deployed to GitHub: gitDivine/marketsassist
 - Next: Vercel deployment
+
+### Session 2 — 2026-04-18
+- Successfully added the Forex.com news button functionality below the ForexFactory Calendar in the `TradeIdeas` component.
+- Dynamically injected the selected market pair into the Forex.com search query.
+- Deployed to the dev Vercel environment (`dev0xdivine-marketsassist.vercel.app`).
+- Deployed to production (`marketsassist.vercel.app`).
+- Code pushed to GitHub repository master branch.
