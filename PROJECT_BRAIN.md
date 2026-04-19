@@ -73,3 +73,6 @@ None currently.
 - Deployed to the dev Vercel environment (`dev0xdivine-marketsassist.vercel.app`).
 - Deployed to production (`marketsassist.vercel.app`).
 - Code pushed to GitHub repository master branch.
+- Fixed routing mappings for specific custom pairs (XAGUSD -> silverusd, XPTUSD -> platinumusd, XAUUSD -> goldusd, USOIL -> wtiusd) for the ForexFactory button.
+- Restored the massive DEV MODE watermark specifically for the `dev` branch.
+- Solidified branching workflow: `dev` for development & `master` for production. Merged latest changes to `master` while explicitly omitting the dev watermark.
